@@ -1,0 +1,33 @@
+// @id nova_spoiler_tools
+// @name Text FX & Spoiler Pack
+// @version 1.0.0
+// @author NovaGram Cloud
+// @description Text styling commands: .spoiler, .mono, .strike, .caps, .leet
+// @permissions ui, commands, messages
+
+nova.commands.register('spoiler', 'Wrap text in Telegram spoiler ||...||', function(ctx) {
+  if (!ctx.args) return null;
+  return { text: '||' + ctx.args + '||' };
+});
+
+nova.commands.register('mono', 'Wrap text in monospace `...`', function(ctx) {
+  if (!ctx.args) return null;
+  return { text: '`' + ctx.args + '`' };
+});
+
+nova.commands.register('caps', 'Convert text to UPPERCASE', function(ctx) {
+  if (!ctx.args) return null;
+  return { text: ctx.args.toUpperCase() };
+});
+
+nova.commands.register('leet', '1337 speak converter', function(ctx) {
+  if (!ctx.args) return null;
+  var map = { a: '4', e: '3', i: '1', o: '0', s: '5', t: '7' };
+  var out = '';
+  for (var i = 0; i < ctx.args.length; i++) {
+    var c = ctx.args.charAt(i);
+    var lo = c.toLowerCase();
+    out += map[lo] ? map[lo] : c;
+  }
+  return { text: out };
+});

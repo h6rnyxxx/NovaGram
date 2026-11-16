@@ -39,6 +39,7 @@ import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.voip.Instance;
 import org.telegram.messenger.voip.VoIPService;
+import org.telegram.novagram.NovaConfig;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
@@ -75,6 +76,20 @@ public class VoIPHelper {
 	private static final int VOIP_SUPPORT_ID = 4244000;
 
 	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance) {
+		if (NovaConfig.isConfirmCalls() && activity != null && user != null) {
+			String name = ContactsController.formatName(user.first_name, user.last_name);
+			new AlertDialog.Builder(activity)
+					.setTitle(LocaleController.getString(videoCall ? R.string.VideoCall : R.string.Call))
+					.setMessage(LocaleController.formatString(R.string.NovaConfirmCallMessage, name))
+					.setPositiveButton(LocaleController.getString(R.string.Call), (dialog, which) -> startCallInternal(user, videoCall, canVideoCall, activity, userFull, accountInstance))
+					.setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+					.show();
+			return;
+		}
+		startCallInternal(user, videoCall, canVideoCall, activity, userFull, accountInstance);
+	}
+
+	private static void startCallInternal(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance) {
 		if (accountInstance == null ? MessagesController.getInstance(UserConfig.selectedAccount).isFrozen() : accountInstance.getMessagesController().isFrozen()) {
 			AccountFrozenAlert.show(accountInstance == null ? UserConfig.selectedAccount : accountInstance.getCurrentAccount());
 			return;

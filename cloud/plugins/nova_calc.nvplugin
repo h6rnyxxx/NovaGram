@@ -1,0 +1,22 @@
+// @id nova_calc
+// @name Inline Calculator
+// @version 1.0.0
+// @author NovaGram Cloud
+// @description Evaluate math cleanly via .calc 2*(3+4)
+// @permissions ui, commands, messages
+
+nova.commands.register('calc', 'Calculate expression before sending', function(ctx) {
+  if (!ctx.args) return null;
+  var expr = ctx.args.replace(/[^0-9+\-*/().%\s]/g, '');
+  if (!expr) {
+    nova.ui.toast('Недопустимое выражение');
+    return { cancel: true };
+  }
+  try {
+    var result = Function('"use strict"; return (' + expr + ');')();
+    return { text: ctx.args + ' = ' + result };
+  } catch (e) {
+    nova.ui.toast('Ошибка вычисления');
+    return { cancel: true };
+  }
+});

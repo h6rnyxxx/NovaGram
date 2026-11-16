@@ -1,0 +1,37 @@
+// @id nova_quick_notes
+// @name Quick Chat Notes
+// @version 1.0.0
+// @author NovaGram Cloud
+// @description Save snippets with .save <key> <value> and paste with .note <key>.
+// @permissions ui, storage, commands, messages
+
+nova.commands.register('save', 'Save a note: .save <name> <text>', function(ctx) {
+  if (!ctx.args) {
+    nova.ui.toast('Использование: .save имя текст');
+    return { cancel: true };
+  }
+  var idx = ctx.args.indexOf(' ');
+  if (idx <= 0) {
+    nova.ui.toast('Укажите текст заметки после имени');
+    return { cancel: true };
+  }
+  var key = ctx.args.substring(0, idx).trim().toLowerCase();
+  var val = ctx.args.substring(idx + 1).trim();
+  nova.storage.set('note_' + key, val);
+  nova.ui.toast('Сохранено: .' + key);
+  return { cancel: true };
+});
+
+nova.commands.register('note', 'Send saved note: .note <name>', function(ctx) {
+  var key = (ctx.args || '').trim().toLowerCase();
+  if (!key) {
+    nova.ui.toast('Использование: .note имя');
+    return { cancel: true };
+  }
+  var val = nova.storage.getString('note_' + key, '');
+  if (!val) {
+    nova.ui.toast('Заметка "' + key + '" не найдена');
+    return { cancel: true };
+  }
+  return { text: val };
+});

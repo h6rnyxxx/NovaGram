@@ -134,6 +134,8 @@ import androidx.viewpager.widget.ViewPager;
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.novagram.NovaConfig;
+import org.telegram.novagram.profile.NovaProfileHelper;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.AuthTokensHelper;
 import org.telegram.messenger.BillingController;
@@ -628,6 +630,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
     private int numberSectionRow;
     private int numberRow;
     public int birthdayRow;
+    private int novaMetaRow;
     private int setUsernameRow;
     private int bioRow;
     private int phoneSuggestionSectionRow;
@@ -4634,6 +4637,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
             } else if (position == noteRow) {
                 editNotes(view, position);
+            } else if (position == novaMetaRow) {
+                long copyId = userId != 0 ? userId : Long.parseLong("-100" + chatId);
+                AndroidUtilities.addToClipboard(String.valueOf(copyId));
+                BulletinFactory.of(ProfileActivity.this).createCopyBulletin(LocaleController.getString(R.string.NovaIdCopied)).show();
             } else {
                 processOnClickOrPress(position, view, x, y);
             }
@@ -10818,6 +10825,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         numberSectionRow = -1;
         numberRow = -1;
         birthdayRow = -1;
+        novaMetaRow = -1;
         setUsernameRow = -1;
         bioRow = -1;
         channelRow = -1;
@@ -11095,6 +11103,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 if (actionsView == null && userId != getUserConfig().getClientUserId()) {
                     notificationsRow = rowCount++;
                 }
+                if (NovaConfig.isProfileMetaRow()) {
+                    novaMetaRow = rowCount++;
+                }
                 if (isBot && user != null && user.bot_has_main_app) {
                     botAppRow = rowCount++;
                 }
@@ -11235,6 +11246,9 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                 }
                 if (ChatObject.isPublic(currentChat)) {
                     usernameRow = rowCount++;
+                }
+                if (NovaConfig.isProfileMetaRow()) {
+                    novaMetaRow = rowCount++;
                 }
             }
             if (emptyRow < 0 && emptyRow2 < 0) {
@@ -13626,7 +13640,14 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                     TextDetailCell detailCell = (TextDetailCell) holder.itemView;
                     boolean containsQr = false;
                     boolean containsGift = false;
-                    if (position == birthdayRow) {
+                    if (position == novaMetaRow) {
+                        TLRPC.User user = userId != 0 ? getMessagesController().getUser(userId) : null;
+                        TLRPC.Chat chat = chatId != 0 ? getMessagesController().getChat(chatId) : null;
+                        String meta = NovaProfileHelper.formatProfileMeta(user, userInfo, chat);
+                        String label = NovaProfileHelper.getProfileMetaLabel(user);
+                        boolean needDivider = (notificationsRow != -1 && notificationsRow > novaMetaRow) || (botAppRow != -1 && botAppRow > novaMetaRow);
+                        detailCell.setTextAndValue(meta, label, needDivider);
+                    } else if (position == birthdayRow) {
                         TLRPC.UserFull userFull = getMessagesController().getUserFull(userId);
                         if (userFull != null && userFull.birthday != null) {
                             final boolean today = BirthdayController.isToday(userFull);
@@ -14458,7 +14479,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
                         position == faqRow || position == policyRow || position == sendLogsRow || position == sendLastLogsRow ||
                         position == clearLogsRow || position == switchBackendRow || position == setAvatarRow ||
                         position == addToGroupButtonRow || position == premiumRow || position == premiumGiftingRow ||
-                        position == businessRow || position == liteModeRow || position == birthdayRow || position == channelRow ||
+                        position == businessRow || position == liteModeRow || position == birthdayRow || position == novaMetaRow || position == channelRow ||
                         position == starsRow || position == tonRow || position == linkedCommunityRow;
             }
             if (holder.itemView instanceof UserCell) {
@@ -14487,7 +14508,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             if (position == infoHeaderRow || position == membersHeaderRow || position == settingsSectionRow2 ||
                     position == numberSectionRow || position == helpHeaderRow || position == debugHeaderRow || position == botPermissionsHeader) {
                 return VIEW_TYPE_HEADER;
-            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow) {
+            } else if (position == phoneRow || position == locationRow || position == numberRow || position == birthdayRow || position == novaMetaRow) {
                 return VIEW_TYPE_TEXT_DETAIL;
             } else if (position == usernameRow || position == setUsernameRow) {
                 return VIEW_TYPE_TEXT_DETAIL_MULTILINE;
@@ -15851,6 +15872,7 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
             put(++pointer, bizHoursRow, sparseIntArray);
             put(++pointer, bizLocationRow, sparseIntArray);
             put(++pointer, birthdayRow, sparseIntArray);
+            put(++pointer, novaMetaRow, sparseIntArray);
             put(++pointer, channelRow, sparseIntArray);
             put(++pointer, botStarsBalanceRow, sparseIntArray);
             put(++pointer, botTonBalanceRow, sparseIntArray);
@@ -16418,6 +16440,10 @@ public class ProfileActivity extends BaseFragment implements NotificationCenter.
         } else if (position == birthdayRow) {
             textToCopy = UserInfoActivity.birthdayString(userInfo.birthday);
             copiedText = getString(R.string.BirthdayCopied);
+        } else if (position == novaMetaRow) {
+            long copyId = userId != 0 ? userId : Long.parseLong("-100" + chatId);
+            textToCopy = String.valueOf(copyId);
+            copiedText = getString(R.string.NovaIdCopied);
         }
 
         final ItemOptions itemOptions = ItemOptions.makeOptions(this, cell);

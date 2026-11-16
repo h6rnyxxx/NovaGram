@@ -2135,6 +2135,10 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
             return;
         }
         if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
+            if (org.telegram.novagram.NovaConfig.isDisableProximity()) {
+                proximityTouched = false;
+                return;
+            }
             if (BuildVars.LOGS_ENABLED) {
                 FileLog.d("proximity changed to " + event.values[0] + " max value = " + event.sensor.getMaximumRange());
             }

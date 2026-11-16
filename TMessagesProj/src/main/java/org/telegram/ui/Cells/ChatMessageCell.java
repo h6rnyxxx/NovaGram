@@ -125,6 +125,8 @@ import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
+import org.telegram.novagram.NovaConfig;
+import org.telegram.novagram.ghost.NovaDeletedMessagesStore;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
@@ -15575,7 +15577,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                 }
                 return LocaleController.formatPmEditedDate(editDate);
             }
-            return getString(R.string.EditedMessage) + " " + LocaleController.getInstance().getFormatterDay().format((long) (message.messageOwner.date) * 1000);
+            return getString(R.string.EditedMessage) + " " + formatNovaTime(message.messageOwner.date);
         } else if (current.isSaved && current.messageOwner.fwd_from != null && (current.messageOwner.fwd_from.date != 0 || current.messageOwner.fwd_from.saved_date != 0)
                 // A widget keeps its time alone in Saved Messages: the pill over its corner stays short.
                 && !(MessageObject.getMedia(current.messageOwner) instanceof TLRPC.TL_messageMediaWidget)) {
@@ -15585,7 +15587,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
             return LocaleController.formatSeenDate(date);
         }
-        return LocaleController.getInstance().getFormatterDay().format((long) (message.messageOwner.date) * 1000);
+        return formatNovaTime(message.messageOwner.date);
+    }
+
+    private static String formatNovaTime(int dateSec) {
+        long ms = (long) dateSec * 1000L;
+        if (NovaConfig.isShowSecondsInTime()) {
+            String pattern = LocaleController.is24HourFormat ? "HH:mm:ss" : "h:mm:ss a";
+            return new java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(new java.util.Date(ms));
+        }
+        return LocaleController.getInstance().getFormatterDay().format(ms);
     }
 
     void measureTime(MessageObject messageObject) {
@@ -15697,6 +15708,16 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             } else {
                 currentTimeString = TextUtils.concat(formatString(R.string.MessageScheduledRepeatSeconds, period), ", ", currentTimeString);
             }
+        }
+        if (NovaConfig.isShowMessageId() && currentMessageObject.getId() > 0 && currentTimeString != null) {
+            currentTimeString = TextUtils.concat("#", String.valueOf(currentMessageObject.getId()), " · ", currentTimeString);
+        }
+        if (NovaConfig.isAntiDeleteMessages() && NovaDeletedMessagesStore.getInstance().isDeleted(currentMessageObject) && currentTimeString != null) {
+            String deletedTag = getString(R.string.NovaDeletedBadge) + " · ";
+            SpannableStringBuilder sb = new SpannableStringBuilder(deletedTag);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(0xFFFF5252), 0, deletedTag.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.append(currentTimeString);
+            currentTimeString = sb;
         }
         timeTextWidth = timeWidth = (int) Math.ceil(Theme.chat_timePaint.measureText(currentTimeString, 0, currentTimeString == null ? 0 : currentTimeString.length()));
         if (currentMessageObject.scheduled && currentMessageObject.messageOwner.date == 0x7FFFFFFE || currentMessageObject.notime) {

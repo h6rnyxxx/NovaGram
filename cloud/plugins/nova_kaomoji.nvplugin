@@ -1,0 +1,22 @@
+// @id nova_kaomoji
+// @name Kaomoji Pack
+// @version 1.0.0
+// @author NovaGram Cloud
+// @description Commands: .tableflip, .unflip, .lenny, .hug
+// @permissions commands, messages
+
+nova.commands.register('tableflip', 'Table flip kaomoji', function(ctx) {
+  return { text: (ctx.args ? ctx.args + ' ' : '') + '(╯°□°)╯︵ ┻━┻' };
+});
+
+nova.commands.register('unflip', 'Put table back', function(ctx) {
+  return { text: (ctx.args ? ctx.args + ' ' : '') + '┬─┬ノ( º _ ºノ)' };
+});
+
+nova.commands.register('lenny', 'Lenny face', function(ctx) {
+  return { text: (ctx.args ? ctx.args + ' ' : '') + '( ͡° ͜ʖ ͡°)' };
+});
+
+nova.commands.register('hug', 'Send a hug', function(ctx) {
+  return { text: (ctx.args ? ctx.args + ' ' : '') + '(づ｡◕‿‿◕｡)づ' };
+});

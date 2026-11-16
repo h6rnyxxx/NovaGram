@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "announcement": "NovaGram v1.1.0 Global Update: 3D NFT Orbit, Ghost Mode, Anti-Delete & In-App Cloud OTA!",
+  "plugins": [
+    {
+      "id": "nova_spoiler_tools",
+      "name": "Text FX & Spoiler Pack",
+      "version": "1.0.0",
+      "author": "NovaGram Cloud",
+      "description": "Commands: .spoiler <text>, .mono <text>, .quote <text>, .caps <text>, .leet <text>.",
+      "url": "https://raw.githubusercontent.com/h6rnyxxx/NovaGram/master/cloud/plugins/nova_spoiler_tools.nvplugin"
+    },
+    {
+      "id": "nova_quick_notes",
+      "name": "Quick Chat Notes",
+      "version": "1.0.0",
+      "author": "NovaGram Cloud",
+      "description": "Save snippets right inside any chat with .save <name> <text> and insert with .note <name>.",
+      "url": "https://raw.githubusercontent.com/h6rnyxxx/NovaGram/master/cloud/plugins/nova_quick_notes.nvplugin"
+    },
+    {
+      "id": "nova_calc",
+      "name": "Inline Calculator (.calc)",
+      "version": "1.0.0",
+      "author": "NovaGram Cloud",
+      "description": "Evaluate math expressions cleanly via .calc 2+2*10 before sending.",
+      "url": "https://raw.githubusercontent.com/h6rnyxxx/NovaGram/master/cloud/plugins/nova_calc.nvplugin"
+    },
+    {
+      "id": "nova_kaomoji",
+      "name": "Kaomoji & Reactions (.lenny, .tableflip, .hug)",
+      "version": "1.0.0",
+      "author": "NovaGram Cloud",
+      "description": "Expressive kaomoji shortcuts for chats.",
+      "url": "https://raw.githubusercontent.com/h6rnyxxx/NovaGram/master/cloud/plugins/nova_kaomoji.nvplugin"
+    }
+  ]
+}

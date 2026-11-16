@@ -22,7 +22,26 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
 
     @Override
     public boolean checkApkInstallPermissions(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && context != null) {
+            try {
+                if (!context.getPackageManager().canRequestPackageInstalls()) {
+                    if (context instanceof Activity) {
+                        NovaUpdateController.getInstance().promptUnknownSources((Activity) context, null);
+                    }
+                    return false;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
         return true;
+    }
+
+    @Override
+    public void onResume() {
+        Activity activity = org.telegram.ui.LaunchActivity.instance;
+        if (activity != null) {
+            NovaUpdateController.getInstance().resumePendingInstallIfReady(activity);
+        }
     }
 
     @Override

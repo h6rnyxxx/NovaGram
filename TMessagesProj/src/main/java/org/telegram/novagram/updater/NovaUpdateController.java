@@ -1,11 +1,20 @@
 package org.telegram.novagram.updater;
 
 import android.app.Activity;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageInstaller;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.text.TextUtils;
 
 import androidx.core.content.FileProvider;
@@ -17,17 +26,39 @@ import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BetaUpdate;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
 import org.telegram.novagram.NovaConfig;
-import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.LaunchActivity;
-import org.telegram.ui.web.HttpGetFileTask;
 import org.telegram.ui.web.HttpGetTask;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
+/**
+ * In-app Cloud OTA updater for NovaGram.
+ * Downloads APK streams directly inside the app with live progress and installs via Android PackageInstaller
+ * without sending users out to GitHub in an external browser.
+ */
 public class NovaUpdateController {
+
+    public interface DownloadProgressListener {
+        void onProgressChanged(float progress, long downloadedBytes, long totalBytes, boolean finished, String error);
+    }
 
     private static volatile NovaUpdateController instance;
 
@@ -63,6 +94,7 @@ public class NovaUpdateController {
     }
 
     private static final long CHECK_INTERVAL_MS = 6L * 60L * 60L * 1000L; // 6 hours
+    private static final String ACTION_INSTALL_COMMIT = "org.telegram.novagram.ACTION_INSTALL_COMMIT";
 
     private String version;
     private int versionCode;
@@ -75,10 +107,15 @@ public class NovaUpdateController {
     private long lastCheck;
 
     private boolean checking;
-    private boolean downloading;
-    private float downloadingProgress;
-    private HttpGetFileTask downloadTask;
+    private volatile boolean downloading;
+    private volatile boolean cancelRequested;
+    private volatile float downloadingProgress;
+    private volatile long downloadedBytes;
+    private volatile long totalBytes;
     private String lastError;
+    private File pendingInstallAfterPermission;
+    private final List<DownloadProgressListener> progressListeners = new ArrayList<>();
+    private BroadcastReceiver installReceiver;
 
     private NovaUpdateController() {
         load();
@@ -148,6 +185,34 @@ public class NovaUpdateController {
         return lastError;
     }
 
+    public synchronized void addProgressListener(DownloadProgressListener listener) {
+        if (listener != null && !progressListeners.contains(listener)) {
+            progressListeners.add(listener);
+        }
+    }
+
+    public synchronized void removeProgressListener(DownloadProgressListener listener) {
+        progressListeners.remove(listener);
+    }
+
+    private void notifyProgressListeners(boolean finished, String error) {
+        List<DownloadProgressListener> snapshot;
+        synchronized (this) {
+            snapshot = new ArrayList<>(progressListeners);
+        }
+        float p = downloadingProgress;
+        long d = downloadedBytes;
+        long t = totalBytes;
+        AndroidUtilities.runOnUIThread(() -> {
+            for (DownloadProgressListener l : snapshot) {
+                try {
+                    l.onProgressChanged(p, d, t, finished, error);
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
     public synchronized ReleaseInfo getPendingRelease() {
         if (TextUtils.isEmpty(version) || compareVersions(version, BuildConfig.NOVA_VERSION_NAME) <= 0) {
             return null;
@@ -162,6 +227,7 @@ public class NovaUpdateController {
     }
 
     public void checkForUpdates(boolean force, Runnable whenDone) {
+        NovaCloudCatalog.getInstance().syncAsync(force, null);
         if (checking) return;
         if (!force && !NovaConfig.isAutoCheckUpdates()) {
             if (whenDone != null) whenDone.run();
@@ -176,17 +242,17 @@ public class NovaUpdateController {
         lastError = null;
         new HttpGetTask(response -> AndroidUtilities.runOnUIThread(() -> {
             checking = false;
-            handleApiResponse(response, force, whenDone);
+            handleApiResponse(response, whenDone);
         }))
                 .setHeader("Accept", "application/vnd.github+json")
                 .setHeader("User-Agent", "NovaGram-Android/" + BuildConfig.NOVA_VERSION_NAME)
                 .execute(NovaConfig.GITHUB_LATEST_RELEASE_API);
     }
 
-    private synchronized void handleApiResponse(String response, boolean manualTrigger, Runnable whenDone) {
+    private synchronized void handleApiResponse(String response, Runnable whenDone) {
         lastCheck = System.currentTimeMillis();
         if (TextUtils.isEmpty(response)) {
-            lastError = "Network error";
+            lastError = LocaleController.getString(R.string.NovaUpdateNetworkError);
             saveLocked();
             if (whenDone != null) whenDone.run();
             return;
@@ -195,7 +261,6 @@ public class NovaUpdateController {
         try {
             JSONObject json = new JSONObject(response);
             if (json.has("message") && !json.has("tag_name")) {
-                // e.g. 404 Not Found when repo has no releases yet
                 String msg = json.optString("message", "");
                 if (!"Not Found".equalsIgnoreCase(msg)) {
                     lastError = msg;
@@ -288,24 +353,211 @@ public class NovaUpdateController {
     }
 
     public synchronized void downloadUpdate() {
-        String targetUrl = !TextUtils.isEmpty(apkUrl) ? apkUrl : releaseUrl;
-        if (!TextUtils.isEmpty(targetUrl) && LaunchActivity.instance != null) {
-            try {
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl));
-                LaunchActivity.instance.startActivity(browserIntent);
-            } catch (Throwable t) {
-                FileLog.e(t);
+        File existing = getDownloadedFile();
+        if (existing != null && LaunchActivity.instance != null) {
+            installDownloadedApk(LaunchActivity.instance, existing);
+            return;
+        }
+        if (downloading) {
+            return;
+        }
+        final String downloadUrl = apkUrl;
+        final String ver = version != null ? version : "latest";
+        final long expectedSize = apkSize;
+
+        if (TextUtils.isEmpty(downloadUrl)) {
+            if (!TextUtils.isEmpty(releaseUrl) && LaunchActivity.instance != null) {
+                try {
+                    LaunchActivity.instance.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)));
+                } catch (Throwable t) {
+                    FileLog.e(t);
+                }
+            }
+            return;
+        }
+
+        downloading = true;
+        cancelRequested = false;
+        downloadingProgress = 0f;
+        downloadedBytes = 0L;
+        totalBytes = expectedSize;
+        lastError = null;
+        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
+        notifyProgressListeners(false, null);
+
+        Thread worker = new Thread(() -> runStreamingDownload(downloadUrl, ver, expectedSize), "NovaCloudOtaDownload");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    private void runStreamingDownload(String startUrl, String ver, long expectedSize) {
+        File updatesDir = new File(ApplicationLoader.applicationContext.getFilesDir(), "novagram_updates");
+        if (!updatesDir.exists()) {
+            updatesDir.mkdirs();
+        }
+        String safeVer = ver.replaceAll("[^a-zA-Z0-9._-]", "_");
+        File partFile = new File(updatesDir, "NovaGram-" + safeVer + ".apk.part");
+        File finalFile = new File(updatesDir, "NovaGram-" + safeVer + ".apk");
+        if (partFile.exists()) {
+            partFile.delete();
+        }
+
+        HttpURLConnection conn = null;
+        try {
+            String currentUrl = startUrl;
+            int redirects = 0;
+            while (redirects < 8) {
+                if (cancelRequested) {
+                    finishDownloadFailure(null, partFile);
+                    return;
+                }
+                URL url = new URL(currentUrl);
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(false);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(25000);
+                conn.setRequestProperty("User-Agent", "NovaGram-Android/" + BuildConfig.NOVA_VERSION_NAME);
+                conn.setRequestProperty("Accept", "application/vnd.android.package-archive, application/octet-stream, */*");
+
+                int code = conn.getResponseCode();
+                if (code == HttpURLConnection.HTTP_MOVED_TEMP
+                        || code == HttpURLConnection.HTTP_MOVED_PERM
+                        || code == HttpURLConnection.HTTP_SEE_OTHER
+                        || code == 307 || code == 308) {
+                    String location = conn.getHeaderField("Location");
+                    conn.disconnect();
+                    conn = null;
+                    if (TextUtils.isEmpty(location)) {
+                        throw new RuntimeException("Empty redirect location");
+                    }
+                    currentUrl = new URL(url, location).toString();
+                    redirects++;
+                    continue;
+                }
+                if (code < 200 || code >= 300) {
+                    throw new RuntimeException("HTTP " + code);
+                }
+                break;
+            }
+            if (conn == null) {
+                throw new RuntimeException("Too many redirects");
+            }
+
+            long contentLen = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
+                    ? conn.getContentLengthLong()
+                    : conn.getContentLength();
+            long resolvedTotal = contentLen > 0 ? contentLen : expectedSize;
+            totalBytes = resolvedTotal;
+
+            long readTotal = 0L;
+            long lastNotifyTime = 0L;
+            try (InputStream is = new BufferedInputStream(conn.getInputStream(), 32768);
+                 FileOutputStream fos = new FileOutputStream(partFile)) {
+                byte[] buf = new byte[32768];
+                int n;
+                while ((n = is.read(buf)) != -1) {
+                    if (cancelRequested) {
+                        finishDownloadFailure(null, partFile);
+                        return;
+                    }
+                    fos.write(buf, 0, n);
+                    readTotal += n;
+                    downloadedBytes = readTotal;
+                    if (resolvedTotal > 0) {
+                        downloadingProgress = Math.max(0f, Math.min(1f, (float) readTotal / (float) resolvedTotal));
+                    }
+                    long now = SystemClock.uptimeMillis();
+                    if (now - lastNotifyTime >= 120) {
+                        lastNotifyTime = now;
+                        AndroidUtilities.runOnUIThread(() ->
+                                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.fileLoadProgressChanged));
+                        notifyProgressListeners(false, null);
+                    }
+                }
+                fos.flush();
+            }
+
+            if (readTotal < 1_000_000L || !hasApkZipSignature(partFile)) {
+                throw new RuntimeException(LocaleController.getString(R.string.NovaUpdateCorrupted));
+            }
+            if (finalFile.exists()) {
+                finalFile.delete();
+            }
+            if (!partFile.renameTo(finalFile)) {
+                throw new RuntimeException("Failed to finalize APK file");
+            }
+
+            synchronized (NovaUpdateController.this) {
+                downloadedPath = finalFile.getAbsolutePath();
+                downloading = false;
+                downloadingProgress = 1f;
+                downloadedBytes = readTotal;
+                saveLocked();
+            }
+
+            AndroidUtilities.runOnUIThread(() -> {
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
+                notifyProgressListeners(true, null);
+                if (LaunchActivity.instance != null) {
+                    installDownloadedApk(LaunchActivity.instance, finalFile);
+                }
+            });
+        } catch (Throwable t) {
+            FileLog.e("NovaGram Cloud OTA download failed", t);
+            String errMsg = !TextUtils.isEmpty(t.getMessage()) ? t.getMessage() : LocaleController.getString(R.string.NovaUpdateNetworkError);
+            finishDownloadFailure(errMsg, partFile);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.disconnect();
+                } catch (Throwable ignored) {
+                }
             }
         }
     }
 
-    public void cancelDownloading() {
-        if (!downloading) return;
-        if (downloadTask != null) {
-            downloadTask.cancel(true);
+    private void finishDownloadFailure(String errMsg, File partFile) {
+        if (partFile != null && partFile.exists()) {
+            try {
+                partFile.delete();
+            } catch (Throwable ignored) {
+            }
         }
+        synchronized (this) {
+            downloading = false;
+            cancelRequested = false;
+            lastError = errMsg;
+        }
+        AndroidUtilities.runOnUIThread(() -> {
+            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
+            notifyProgressListeners(true, errMsg);
+            if (!TextUtils.isEmpty(errMsg) && LaunchActivity.instance != null) {
+                BaseFragment f = LaunchActivity.getLastFragment();
+                if (f != null && f.getLayoutContainer() != null) {
+                    BulletinFactory.of(f).createErrorBulletin(errMsg).show();
+                }
+            }
+        });
+    }
+
+    private static boolean hasApkZipSignature(File file) {
+        if (file == null || !file.exists() || file.length() < 4) {
+            return false;
+        }
+        try (FileInputStream fis = new FileInputStream(file)) {
+            byte[] header = new byte[4];
+            return fis.read(header) == 4 && header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public synchronized void cancelDownloading() {
+        if (!downloading) return;
+        cancelRequested = true;
         downloading = false;
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
+        notifyProgressListeners(true, null);
     }
 
     public boolean isDownloading() {
@@ -314,6 +566,14 @@ public class NovaUpdateController {
 
     public float getDownloadingProgress() {
         return downloadingProgress;
+    }
+
+    public long getDownloadedBytes() {
+        return downloadedBytes;
+    }
+
+    public long getTotalBytes() {
+        return totalBytes;
     }
 
     public synchronized File getDownloadedFile() {
@@ -327,12 +587,102 @@ public class NovaUpdateController {
         return f;
     }
 
+    public void resumePendingInstallIfReady(Activity activity) {
+        if (activity == null || pendingInstallAfterPermission == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity.getPackageManager().canRequestPackageInstalls()) {
+            File file = pendingInstallAfterPermission;
+            pendingInstallAfterPermission = null;
+            installDownloadedApk(activity, file);
+        }
+    }
+
+    public void promptUnknownSources(Activity activity, File pendingFile) {
+        if (activity == null) return;
+        pendingInstallAfterPermission = pendingFile;
+        new AlertDialog.Builder(activity)
+                .setTitle(LocaleController.getString(R.string.NovaInstallPermTitle))
+                .setMessage(LocaleController.getString(R.string.NovaInstallPermMessage))
+                .setPositiveButton(LocaleController.getString(R.string.PermissionOpenSettings), (d, w) -> {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:" + activity.getPackageName()));
+                        activity.startActivity(intent);
+                    } catch (Throwable t) {
+                        FileLog.e(t);
+                    }
+                })
+                .setNegativeButton(LocaleController.getString(R.string.Cancel), (d, w) -> pendingInstallAfterPermission = null)
+                .show();
+    }
+
     public void installDownloadedApk(Activity activity, File file) {
         if (activity == null || file == null || !file.exists()) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
-            AlertsCreator.createApkRestrictedDialog(activity, null).show();
+            promptUnknownSources(activity, file);
             return;
         }
+
+        if (!isApkSignatureCompatible(activity, file)) {
+            new AlertDialog.Builder(activity)
+                    .setTitle(LocaleController.getString(R.string.NovaSignatureMismatchTitle))
+                    .setMessage(LocaleController.getString(R.string.NovaSignatureMismatchMessage))
+                    .setPositiveButton(LocaleController.getString(R.string.NovaInstallTryAnyway), (d, w) -> installWithPackageInstallerOrIntent(activity, file))
+                    .setNeutralButton(LocaleController.getString(R.string.NovaOpenDownloadsFolder), (d, w) -> {
+                        if (!TextUtils.isEmpty(releaseUrl)) {
+                            try {
+                                activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)));
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                    })
+                    .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+                    .show();
+            return;
+        }
+
+        installWithPackageInstallerOrIntent(activity, file);
+    }
+
+    private void installWithPackageInstallerOrIntent(Activity activity, File file) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                registerInstallReceiver(activity.getApplicationContext());
+                PackageInstaller installer = activity.getPackageManager().getPackageInstaller();
+                PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+                params.setAppPackageName(activity.getPackageName());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+                }
+                int sessionId = installer.createSession(params);
+                try (PackageInstaller.Session session = installer.openSession(sessionId);
+                     InputStream in = new FileInputStream(file);
+                     OutputStream out = session.openWrite("NovaGramUpdate", 0, file.length())) {
+                    byte[] buffer = new byte[32768];
+                    int c;
+                    while ((c = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, c);
+                    }
+                    session.fsync(out);
+                    out.close();
+
+                    Intent callbackIntent = new Intent(ACTION_INSTALL_COMMIT);
+                    callbackIntent.setPackage(activity.getPackageName());
+                    int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        flags |= PendingIntent.FLAG_MUTABLE;
+                    }
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, sessionId, callbackIntent, flags);
+                    session.commit(pendingIntent.getIntentSender());
+                    return;
+                }
+            } catch (Throwable t) {
+                FileLog.e("PackageInstaller failed, falling back to FileProvider ACTION_VIEW", t);
+            }
+        }
+
+        // Fallback via FileProvider
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -342,6 +692,87 @@ public class NovaUpdateController {
         } catch (Throwable t) {
             FileLog.e(t);
         }
+    }
+
+    private synchronized void registerInstallReceiver(Context appContext) {
+        if (installReceiver != null || appContext == null) {
+            return;
+        }
+        installReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
+                if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+                    Intent confirmIntent = intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                    if (confirmIntent != null && LaunchActivity.instance != null) {
+                        confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        try {
+                            LaunchActivity.instance.startActivity(confirmIntent);
+                        } catch (Throwable t) {
+                            FileLog.e(t);
+                        }
+                    }
+                } else if (status == PackageInstaller.STATUS_SUCCESS) {
+                    BaseFragment f = LaunchActivity.getLastFragment();
+                    if (f != null && f.getLayoutContainer() != null) {
+                        BulletinFactory.of(f).createSimpleBulletin(R.raw.chats_infotip, LocaleController.getString(R.string.NovaInstallSuccess)).show();
+                    }
+                } else {
+                    String msg = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
+                    FileLog.e("NovaGram PackageInstaller status=" + status + " msg=" + msg);
+                    if (status == PackageInstaller.STATUS_FAILURE_CONFLICT && LaunchActivity.instance != null) {
+                        new AlertDialog.Builder(LaunchActivity.instance)
+                                .setTitle(LocaleController.getString(R.string.NovaSignatureMismatchTitle))
+                                .setMessage(LocaleController.getString(R.string.NovaSignatureMismatchMessage))
+                                .setPositiveButton(LocaleController.getString(R.string.OK), null)
+                                .show();
+                    }
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(ACTION_INSTALL_COMMIT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            appContext.registerReceiver(installReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            appContext.registerReceiver(installReceiver, filter);
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static boolean isApkSignatureCompatible(Context context, File apkFile) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    ? PackageManager.GET_SIGNING_CERTIFICATES
+                    : PackageManager.GET_SIGNATURES;
+            PackageInfo installed = pm.getPackageInfo(context.getPackageName(), flags);
+            PackageInfo archive = pm.getPackageArchiveInfo(apkFile.getAbsolutePath(), flags);
+            if (installed == null || archive == null) {
+                return true;
+            }
+            if (!TextUtils.isEmpty(archive.packageName) && !TextUtils.equals(installed.packageName, archive.packageName)) {
+                return false;
+            }
+            Signature[] instSigs = getSignaturesFromInfo(installed);
+            Signature[] archSigs = getSignaturesFromInfo(archive);
+            if (instSigs == null || archSigs == null || instSigs.length == 0 || archSigs.length == 0) {
+                return true;
+            }
+            return Arrays.equals(instSigs[0].toByteArray(), archSigs[0].toByteArray());
+        } catch (Throwable t) {
+            FileLog.e("Signature compatibility check skipped", t);
+            return true;
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Signature[] getSignaturesFromInfo(PackageInfo info) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && info.signingInfo != null) {
+            Signature[] hist = info.signingInfo.getSigningCertificateHistory();
+            if (hist != null && hist.length > 0) return hist;
+            return info.signingInfo.getApkContentsSigners();
+        }
+        return info.signatures;
     }
 
     public static String normalizeVersion(String raw) {

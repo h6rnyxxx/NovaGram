@@ -13,9 +13,12 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.novagram.NovaConfig;
 import org.telegram.novagram.design.NovaDesignManager;
+import org.telegram.novagram.ghost.NovaDeletedMessagesStore;
 import org.telegram.novagram.plugins.NovaPluginManager;
+import org.telegram.novagram.updater.NovaCloudCatalog;
 import org.telegram.novagram.updater.NovaUpdateController;
 import org.telegram.novagram.updater.NovaUpdateDialog;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.UItem;
@@ -39,6 +42,21 @@ public class NovaSettingsActivity extends UniversalFragment {
     private static final int ID_PALETTE_OCEAN = 34;
 
     private static final int ID_FONTS = 40;
+
+    private static final int ID_PROFILE_ORBIT = 50;
+    private static final int ID_PROFILE_AURA = 51;
+    private static final int ID_PROFILE_META = 52;
+
+    private static final int ID_ANTI_DELETE = 60;
+    private static final int ID_GHOST_READ = 61;
+    private static final int ID_GHOST_TYPE = 62;
+    private static final int ID_GHOST_OFFLINE = 63;
+    private static final int ID_CLEAR_DELETED_CACHE = 64;
+
+    private static final int ID_SHOW_SECONDS = 70;
+    private static final int ID_SHOW_MSG_ID = 71;
+    private static final int ID_CONFIRM_CALLS = 72;
+    private static final int ID_DISABLE_PROXIMITY = 73;
 
     private static final int ID_PLUGINS_MANAGE = 10;
     private static final int ID_PLUGINS_ENABLED = 11;
@@ -128,6 +146,38 @@ public class NovaSettingsActivity extends UniversalFragment {
         items.add(UItem.asButton(ID_FONTS, R.drawable.msg_theme, getString(R.string.NovaFontsRow), getCurrentFontLabel()));
         items.add(UItem.asShadow(null));
 
+        items.add(UItem.asHeader(getString(R.string.NovaProfileHeader)));
+        items.add(UItem.asCheck(ID_PROFILE_ORBIT, getString(R.string.NovaProfileOrbitNfts))
+                .setChecked(NovaConfig.isProfileOrbitNfts()));
+        items.add(UItem.asCheck(ID_PROFILE_AURA, getString(R.string.NovaProfileAura))
+                .setChecked(NovaConfig.isProfileAura()));
+        items.add(UItem.asCheck(ID_PROFILE_META, getString(R.string.NovaProfileMetaRow))
+                .setChecked(NovaConfig.isProfileMetaRow()));
+        items.add(UItem.asShadow(getString(R.string.NovaProfileInfo)));
+
+        items.add(UItem.asHeader(getString(R.string.NovaGhostHeader)));
+        items.add(UItem.asCheck(ID_ANTI_DELETE, getString(R.string.NovaAntiDelete))
+                .setChecked(NovaConfig.isAntiDeleteMessages()));
+        items.add(UItem.asCheck(ID_GHOST_READ, getString(R.string.NovaGhostDontRead))
+                .setChecked(NovaConfig.isGhostDontRead()));
+        items.add(UItem.asCheck(ID_GHOST_TYPE, getString(R.string.NovaGhostDontType))
+                .setChecked(NovaConfig.isGhostDontType()));
+        items.add(UItem.asCheck(ID_GHOST_OFFLINE, getString(R.string.NovaGhostOffline))
+                .setChecked(NovaConfig.isGhostOffline()));
+        items.add(UItem.asButton(ID_CLEAR_DELETED_CACHE, R.drawable.msg_delete, getString(R.string.NovaClearDeletedCache)));
+        items.add(UItem.asShadow(getString(R.string.NovaGhostInfo)));
+
+        items.add(UItem.asHeader(getString(R.string.NovaChatsHeader)));
+        items.add(UItem.asCheck(ID_SHOW_SECONDS, getString(R.string.NovaShowSecondsInTime))
+                .setChecked(NovaConfig.isShowSecondsInTime()));
+        items.add(UItem.asCheck(ID_SHOW_MSG_ID, getString(R.string.NovaShowMessageId))
+                .setChecked(NovaConfig.isShowMessageId()));
+        items.add(UItem.asCheck(ID_CONFIRM_CALLS, getString(R.string.NovaConfirmCalls))
+                .setChecked(NovaConfig.isConfirmCalls()));
+        items.add(UItem.asCheck(ID_DISABLE_PROXIMITY, getString(R.string.NovaDisableProximity))
+                .setChecked(NovaConfig.isDisableProximity()));
+        items.add(UItem.asShadow(null));
+
         items.add(UItem.asHeader(getString(R.string.NovaPluginsHeader)));
         int activeCount = NovaPluginManager.getInstance().getActivePluginsCount();
         int totalCount = NovaPluginManager.getInstance().getPlugins().size();
@@ -145,19 +195,26 @@ public class NovaSettingsActivity extends UniversalFragment {
         String updateValue;
         if (updater.isChecking()) {
             updateValue = getString(R.string.NovaUpdateChecking);
+        } else if (updater.isDownloading()) {
+            updateValue = ((int) (updater.getDownloadingProgress() * 100f)) + "%";
         } else if (pending != null) {
             updateValue = "v" + pending.version + "!";
         } else {
             updateValue = "v" + BuildConfig.NOVA_VERSION_NAME;
         }
         items.add(UItem.asButton(ID_UPDATE_CHECK, R.drawable.msg_download, getString(R.string.NovaUpdateCheckNow), updateValue));
+        String cloudMotd = NovaCloudCatalog.getInstance().getAnnouncement();
         items.add(UItem.asButton(ID_OPEN_GITHUB, R.drawable.msg_openin, getString(R.string.NovaOpenGitHub), NovaConfig.GITHUB_REPO));
-        items.add(UItem.asShadow(LocaleController.formatString(
+        String footer = LocaleController.formatString(
                 R.string.NovaAboutFooter,
                 BuildConfig.NOVA_VERSION_NAME,
                 BuildConfig.BUILD_VERSION_STRING,
                 Build.VERSION.RELEASE
-        )));
+        );
+        if (!TextUtils.isEmpty(cloudMotd)) {
+            footer = cloudMotd + "\n\n" + footer;
+        }
+        items.add(UItem.asShadow(footer));
     }
 
     private String getCurrentFontLabel() {
@@ -222,6 +279,52 @@ public class NovaSettingsActivity extends UniversalFragment {
             case ID_FONTS:
                 presentFragment(new NovaFontsActivity());
                 return;
+            case ID_PROFILE_ORBIT:
+                NovaConfig.setProfileOrbitNfts(!NovaConfig.isProfileOrbitNfts());
+                break;
+            case ID_PROFILE_AURA:
+                NovaConfig.setProfileAura(!NovaConfig.isProfileAura());
+                break;
+            case ID_PROFILE_META:
+                NovaConfig.setProfileMetaRow(!NovaConfig.isProfileMetaRow());
+                break;
+            case ID_ANTI_DELETE:
+                NovaConfig.setAntiDeleteMessages(!NovaConfig.isAntiDeleteMessages());
+                break;
+            case ID_GHOST_READ:
+                NovaConfig.setGhostDontRead(!NovaConfig.isGhostDontRead());
+                break;
+            case ID_GHOST_TYPE:
+                NovaConfig.setGhostDontType(!NovaConfig.isGhostDontType());
+                break;
+            case ID_GHOST_OFFLINE:
+                NovaConfig.setGhostOffline(!NovaConfig.isGhostOffline());
+                break;
+            case ID_CLEAR_DELETED_CACHE:
+                if (getParentActivity() != null) {
+                    new AlertDialog.Builder(getParentActivity())
+                            .setTitle(getString(R.string.NovaClearDeletedCache))
+                            .setMessage(getString(R.string.NovaClearDeletedCacheConfirm))
+                            .setPositiveButton(getString(R.string.Delete), (d, w) -> {
+                                NovaDeletedMessagesStore.getInstance().clearAll();
+                                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, getString(R.string.NovaDeletedCacheCleared)).show();
+                            })
+                            .setNegativeButton(getString(R.string.Cancel), null)
+                            .show();
+                }
+                return;
+            case ID_SHOW_SECONDS:
+                NovaConfig.setShowSecondsInTime(!NovaConfig.isShowSecondsInTime());
+                break;
+            case ID_SHOW_MSG_ID:
+                NovaConfig.setShowMessageId(!NovaConfig.isShowMessageId());
+                break;
+            case ID_CONFIRM_CALLS:
+                NovaConfig.setConfirmCalls(!NovaConfig.isConfirmCalls());
+                break;
+            case ID_DISABLE_PROXIMITY:
+                NovaConfig.setDisableProximity(!NovaConfig.isDisableProximity());
+                break;
             case ID_PLUGINS_MANAGE:
                 presentFragment(new NovaPluginsActivity());
                 return;
@@ -247,6 +350,10 @@ public class NovaSettingsActivity extends UniversalFragment {
     private void checkUpdatesFromUi() {
         NovaUpdateController updater = NovaUpdateController.getInstance();
         if (updater.isChecking()) {
+            return;
+        }
+        if ((updater.isDownloading() || updater.getDownloadedFile() != null) && updater.getPendingRelease() != null) {
+            NovaUpdateDialog.show(getParentActivity(), updater.getPendingRelease());
             return;
         }
         listView.adapter.update(true);
