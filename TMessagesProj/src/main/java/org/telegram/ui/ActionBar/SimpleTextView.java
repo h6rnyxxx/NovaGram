@@ -145,6 +145,10 @@ public class SimpleTextView extends View implements Drawable.Callback {
     public SimpleTextView(Context context) {
         super(context);
         textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        Typeface novaTf = org.telegram.novagram.design.NovaFontManager.getRegularTypeface();
+        if (novaTf != null) {
+            textPaint.setTypeface(novaTf);
+        }
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 

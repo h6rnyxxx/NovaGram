@@ -2498,7 +2498,17 @@ public class AndroidUtilities {
         return result;
     }
 
+    public static void clearTypefaceCache() {
+        synchronized (typefaceCache) {
+            typefaceCache.clear();
+        }
+    }
+
     public static Typeface getTypeface(String assetPath) {
+        Typeface novaCustom = org.telegram.novagram.design.NovaFontManager.resolveTypeface(assetPath);
+        if (novaCustom != null) {
+            return novaCustom;
+        }
         synchronized (typefaceCache) {
             if (!typefaceCache.containsKey(assetPath)) {
                 try {

@@ -11735,4 +11735,25 @@
     <string name="NovaUpdateTitle">NovaGram Update Available</string>
     <string name="NovaUpdateDownload">Download &amp; Install</string>
     <string name="NovaUpdateLater">Later</string>
+    <string name="NovaPaletteHeader">Material You Palette</string>
+    <string name="NovaPaletteSystem">System Wallpaper (Dynamic)</string>
+    <string name="NovaPaletteLavender">Lavender Monet</string>
+    <string name="NovaPaletteEmerald">Emerald Mint</string>
+    <string name="NovaPaletteSunset">Warm Sunset</string>
+    <string name="NovaPaletteOcean">Deep Ocean</string>
+    <string name="NovaPaletteInfo">Choose dynamic colors from your Android wallpaper or pick a curated Material You palette.</string>
+    <string name="NovaFontsTitle">Fonts</string>
+    <string name="NovaFontsRow">App Font</string>
+    <string name="NovaFontsBuiltIn">Built-in Styles</string>
+    <string name="NovaFontSystem">Telegram Default</string>
+    <string name="NovaFontSansMedium">Clean Sans Medium</string>
+    <string name="NovaFontCondensed">Roboto Condensed</string>
+    <string name="NovaFontSerif">Editorial Serif</string>
+    <string name="NovaFontMono">Developer Mono</string>
+    <string name="NovaFontCustomHeader">Custom Font</string>
+    <string name="NovaFontImport">Import Font (.ttf / .otf)</string>
+    <string name="NovaFontImportHint">You can also install .ttf / .otf font files directly from any Telegram chat via the message menu.</string>
+    <string name="NovaInstallFont">Install NovaGram Font</string>
+    <string name="NovaFontInstalled">Applied font: %1$s</string>
+    <string name="NovaFontInstallFailed">Could not load font file.</string>
 </resources>

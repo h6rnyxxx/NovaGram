@@ -39,6 +39,7 @@ import java.util.Map;
 public class NovaPluginManager {
 
     public static final int OPTION_INSTALL_PLUGIN_FILE = 9500;
+    public static final int OPTION_INSTALL_FONT_FILE = 9501;
     public static final int OPTION_PLUGIN_MENU_BASE = 9600;
 
     public static class OutgoingResult {
@@ -352,6 +353,10 @@ public class NovaPluginManager {
             items.add(LocaleController.getString(R.string.NovaInstallPlugin));
             options.add(OPTION_INSTALL_PLUGIN_FILE);
             icons.add(R.drawable.msg_add);
+        } else if (isFontDocument(message)) {
+            items.add(LocaleController.getString(R.string.NovaInstallFont));
+            options.add(OPTION_INSTALL_FONT_FILE);
+            icons.add(R.drawable.msg_theme);
         }
 
         if (!NovaConfig.isPluginsEnabled()) return;
@@ -372,6 +377,31 @@ public class NovaPluginManager {
     }
 
     public synchronized boolean handleMessageMenuOption(ChatActivity chatActivity, int option, MessageObject message) {
+        if (option == OPTION_INSTALL_FONT_FILE && message != null) {
+            TLRPC.Document doc = message.getDocument();
+            if (doc != null) {
+                File file = FileLoader.getInstance(chatActivity.getCurrentAccount()).getPathToAttach(doc, true);
+                if (file != null && file.exists()) {
+                    boolean ok = org.telegram.novagram.design.NovaFontManager.installFontFromFile(file);
+                    if (ok) {
+                        BulletinFactory.of(chatActivity).createSimpleBulletin(
+                                R.raw.chats_infotip,
+                                LocaleController.formatString(R.string.NovaFontInstalled, file.getName())
+                        ).show();
+                    } else {
+                        BulletinFactory.of(chatActivity).createErrorBulletin(LocaleController.getString(R.string.NovaFontInstallFailed)).show();
+                    }
+                } else {
+                    new AlertDialog.Builder(chatActivity.getContext())
+                            .setTitle("NovaGram")
+                            .setMessage(LocaleController.getString(R.string.NovaPluginDownloadFirst))
+                            .setPositiveButton("OK", null)
+                            .show();
+                }
+            }
+            return true;
+        }
+
         if (option == OPTION_INSTALL_PLUGIN_FILE && message != null) {
             TLRPC.Document doc = message.getDocument();
             if (doc != null) {
@@ -404,6 +434,14 @@ public class NovaPluginManager {
         Scriptable msgObj = createMessageJsObject(target.plugin, message);
         NovaPluginEngine.invokeFunction(target.plugin, target.action.handler, msgObj);
         return true;
+    }
+
+    public static boolean isFontDocument(MessageObject message) {
+        if (message == null) return false;
+        TLRPC.Document doc = message.getDocument();
+        if (doc == null) return false;
+        String fileName = FileLoader.getDocumentFileName(doc);
+        return org.telegram.novagram.design.NovaFontManager.isFontFileName(fileName);
     }
 
     public static boolean isPluginDocument(MessageObject message) {

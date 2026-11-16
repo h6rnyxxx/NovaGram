@@ -2,9 +2,12 @@ package org.telegram.novagram.design;
 
 import android.os.Build;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LiteMode;
 import org.telegram.novagram.NovaConfig;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.BlurSettingsBottomSheet;
+import org.telegram.ui.LaunchActivity;
 import org.telegram.utils.glass.GlassEngine;
 
 public class NovaDesignManager {
@@ -19,7 +22,21 @@ public class NovaDesignManager {
     }
 
     public static void refreshTheme() {
-        Theme.refreshThemeColors(true, true);
+        AndroidUtilities.runOnUIThread(() -> {
+            Theme.refreshThemeColors(true, true);
+            NovaFontManager.applyToThemePaints();
+            Theme.applyCommonTheme();
+            Theme.applyDialogsTheme();
+            Theme.applyChatTheme(false, true);
+            if (LaunchActivity.instance != null) {
+                if (LaunchActivity.instance.actionBarLayout != null) {
+                    LaunchActivity.instance.actionBarLayout.rebuildAllFragmentViews(true, true);
+                }
+                if (LaunchActivity.instance.rightActionBarLayout != null) {
+                    LaunchActivity.instance.rightActionBarLayout.rebuildAllFragmentViews(true, true);
+                }
+            }
+        });
     }
 
     private static void applyDesignModeInternal(int mode, boolean refreshUi) {
@@ -30,7 +47,9 @@ public class NovaDesignManager {
         int flags = LiteMode.getValue(true);
         if (wantBlur) {
             flags |= LiteMode.FLAG_CHAT_BLUR;
-        } else if (mode == NovaConfig.DESIGN_CLASSIC) {
+            BlurSettingsBottomSheet.blurRadius = 1.0f;
+            BlurSettingsBottomSheet.blurAlpha = NovaConfig.getLiquidGlassAlpha() / 100f;
+        } else {
             flags &= ~LiteMode.FLAG_LIQUID_GLASS;
         }
 
@@ -44,7 +63,7 @@ public class NovaDesignManager {
         GlassEngine.getCurrentGlassSettings();
 
         if (refreshUi) {
-            Theme.refreshThemeColors(true, true);
+            refreshTheme();
         }
     }
 

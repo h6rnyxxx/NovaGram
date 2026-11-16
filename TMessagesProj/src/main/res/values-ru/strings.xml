@@ -319,4 +319,25 @@
     <string name="NovaUpdateTitle">Доступно обновление NovaGram</string>
     <string name="NovaUpdateDownload">Скачать и установить</string>
     <string name="NovaUpdateLater">Позже</string>
+    <string name="NovaPaletteHeader">Палитра Material You</string>
+    <string name="NovaPaletteSystem">Системная (из обоев)</string>
+    <string name="NovaPaletteLavender">Лавандовый Monet</string>
+    <string name="NovaPaletteEmerald">Изумрудная мята</string>
+    <string name="NovaPaletteSunset">Тёплый закат</string>
+    <string name="NovaPaletteOcean">Глубокий океан</string>
+    <string name="NovaPaletteInfo">Используйте цвета ваших обоев Android или выберите готовую палитру Material You.</string>
+    <string name="NovaFontsTitle">Шрифты</string>
+    <string name="NovaFontsRow">Шрифт интерфейса</string>
+    <string name="NovaFontsBuiltIn">Встроенные шрифты</string>
+    <string name="NovaFontSystem">Стандартный Telegram</string>
+    <string name="NovaFontSansMedium">Clean Sans Medium</string>
+    <string name="NovaFontCondensed">Roboto Condensed</string>
+    <string name="NovaFontSerif">Editorial Serif</string>
+    <string name="NovaFontMono">Моноширинный (Mono)</string>
+    <string name="NovaFontCustomHeader">Свой шрифт</string>
+    <string name="NovaFontImport">Импортировать шрифт (.ttf / .otf)</string>
+    <string name="NovaFontImportHint">Файлы шрифтов .ttf / .otf также можно устанавливать прямо из любого чата через меню сообщения.</string>
+    <string name="NovaInstallFont">Установить шрифт NovaGram</string>
+    <string name="NovaFontInstalled">Шрифт применён: %1$s</string>
+    <string name="NovaFontInstallFailed">Не удалось загрузить файл шрифта.</string>
 </resources>

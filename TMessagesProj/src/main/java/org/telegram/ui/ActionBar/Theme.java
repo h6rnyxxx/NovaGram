@@ -8066,6 +8066,7 @@ public class Theme {
         setDrawableColorByKey(dialogs_holidayDrawable, key_actionBarDefaultTitle);
         setDrawableColorByKey(dialogs_scamDrawable, key_chats_draft);
         setDrawableColorByKey(dialogs_fakeDrawable, key_chats_draft);
+        org.telegram.novagram.design.NovaFontManager.applyToThemePaints();
     }
 
     public static void destroyResources() {
@@ -9149,7 +9150,7 @@ public class Theme {
                 || key_chat_stickerReplyLine == key || key_chat_stickerReplyNameText == key || key_chat_stickerReplyMessageText == key)) {
             return 0xffffffff;
         }
-        if (currentTheme == defaultTheme && !org.telegram.novagram.NovaConfig.isMaterialYouActive()) {
+        if (currentTheme == defaultTheme && !org.telegram.novagram.NovaConfig.isMaterialYouActive() && !org.telegram.novagram.NovaConfig.isLiquidGlassActive()) {
             boolean useDefault;
             if (isMyMessagesBubbles(key)) {
                 useDefault = currentTheme.isDefaultMyMessagesBubbles();
