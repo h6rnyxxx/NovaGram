@@ -25,8 +25,7 @@
 
 ## Сборка и релизы (GitHub Actions)
 
-Готовый workflow для автоматической сборки APK и публикации релизов находится в [`ci/build.yml`](ci/build.yml).
-Чтобы активировать GitHub Actions в репозитории, перенесите или скопируйте содержимое [`ci/build.yml`](ci/build.yml) в `.github/workflows/build.yml` (через веб-интерфейс GitHub или локально после выдачи токена со scope `workflow`):
+Репозиторий настроен для автоматической сборки APK через [`.github/workflows/build.yml`](.github/workflows/build.yml):
 1. Перейдите в **Settings → Secrets and variables → Actions** вашего репозитория и при желании добавьте свои ключи Telegram API:
    - `NOVA_APP_ID` (с [my.telegram.org](https://my.telegram.org))
    - `NOVA_APP_HASH`
