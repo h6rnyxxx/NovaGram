@@ -339,8 +339,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
     private Dialog permissionsShowDialog;
     private ArrayList<String> permissionsItems = new ArrayList<>();
     private ArrayList<String> permissionsShowItems = new ArrayList<>();
-    private boolean checkPermissions = true;
-    private boolean checkShowPermissions = true;
+    private boolean checkPermissions = false;
+    private boolean checkShowPermissions = false;
     private boolean newAccount;
     private boolean syncContacts = true;
     private boolean testBackend = false;
@@ -791,6 +791,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         proxyButtonView = new ImageView(context);
         proxyButtonView.setImageDrawable(proxyDrawable = new ProxyDrawable(context));
         proxyButtonView.setOnClickListener(v -> presentFragment(new ProxyListActivity()));
+        proxyButtonView.setOnLongClickListener(v -> {
+            showNovaApiConfigDialog();
+            return true;
+        });
         proxyButtonView.setAlpha(0f);
         proxyButtonView.setVisibility(View.GONE);
         sizeNotifierFrameLayout.addView(proxyButtonView, LayoutHelper.createFrame(32, 32, Gravity.RIGHT | Gravity.TOP, 16, 16, 16, 16));
@@ -1055,6 +1059,41 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             FileLog.e(e);
         }
         return null;
+    }
+
+    private void showNovaApiConfigDialog() {
+        if (getParentActivity() == null) return;
+        LinearLayout layout = new LinearLayout(getParentActivity());
+        layout.setOrientation(LinearLayout.VERTICAL);
+        int pad = AndroidUtilities.dp(20);
+        layout.setPadding(pad, AndroidUtilities.dp(8), pad, 0);
+
+        EditText idInput = new EditText(getParentActivity());
+        idInput.setHint("API ID (e.g. 12345678)");
+        idInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        idInput.setText(BuildVars.APP_ID != 4 ? String.valueOf(BuildVars.APP_ID) : "");
+        idInput.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        idInput.setHintTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+        layout.addView(idInput, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        EditText hashInput = new EditText(getParentActivity());
+        hashInput.setHint("API Hash (32 hex chars)");
+        hashInput.setText(BuildVars.APP_ID != 4 ? BuildVars.APP_HASH : "");
+        hashInput.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        hashInput.setHintTextColor(Theme.getColor(Theme.key_dialogTextGray3));
+        layout.addView(hashInput, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
+
+        new AlertDialog.Builder(getParentActivity())
+                .setTitle("NovaGram API (my.telegram.org)")
+                .setView(layout)
+                .setPositiveButton(getString(R.string.Save), (d, w) -> {
+                    int id = Utilities.parseInt(idInput.getText().toString().trim());
+                    String hash = hashInput.getText().toString().trim();
+                    BuildVars.saveCustomApiCredentials(id, hash);
+                    ConnectionsManager.getInstance(currentAccount).cleanup(false);
+                })
+                .setNegativeButton(getString(R.string.Cancel), null)
+                .show();
     }
 
     private void clearCurrentState() {
@@ -1536,8 +1575,8 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
 
         if (needFloatingButton) {
             if (page == VIEW_PHONE_INPUT) {
-                checkPermissions = true;
-                checkShowPermissions = true;
+                checkPermissions = false;
+                checkShowPermissions = false;
             }
             currentDoneType = DONE_TYPE_ACTION;
             showDoneButton(false, animated);
@@ -3113,12 +3152,11 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             }
 
             TLRPC.TL_codeSettings settings = new TLRPC.TL_codeSettings();
-            settings.allow_flashcall = simcardAvailable && allowCall && allowCancelCall && allowReadCallLog;
-            settings.allow_missed_call = simcardAvailable && allowCall;
-            settings.allow_app_hash = settings.allow_firebase = PushListenerController.GooglePushListenerServiceProvider.INSTANCE.hasServices();
-            if (forceDisableSafetyNet || TextUtils.isEmpty(BuildVars.SAFETYNET_KEY)) {
-                settings.allow_firebase = false;
-            }
+            settings.allow_flashcall = false;
+            settings.allow_missed_call = false;
+            settings.allow_app_hash = false;
+            settings.allow_firebase = false;
+            forceDisableSafetyNet = true;
 
             ArrayList<TLRPC.TL_auth_authorization> loginTokens = AuthTokensHelper.getSavedLogInTokens();
             if (loginTokens != null) {
@@ -3271,9 +3309,27 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                             needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("CodeExpired", R.string.CodeExpired));
                         } else if (error.text.startsWith("FLOOD_WAIT")) {
                             needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
-                        } else if (error.code != -1000) {
-                            AlertsCreator.processError(currentAccount, error, LoginActivity.this, req, phoneInputData.phoneNumber);
+                        } else {
+                            Dialog shown = error.code != 406 && error.code != -1000
+                                    ? AlertsCreator.processError(currentAccount, error, LoginActivity.this, req, phoneInputData.phoneNumber)
+                                    : null;
+                            if (shown == null && getParentActivity() != null) {
+                                String errText = "Error " + error.code + ": " + error.text;
+                                AlertDialog.Builder errBuilder = new AlertDialog.Builder(getParentActivity());
+                                errBuilder.setTitle(getString(R.string.AppName));
+                                if (error.text.contains("UPDATE_APP") || error.text.contains("API_ID") || error.code == 406) {
+                                    errBuilder.setMessage(errText + "\n\nЕсли сервер требует официальный ключ, введите свой API ID / Hash с my.telegram.org.");
+                                    errBuilder.setNeutralButton("API ID / Hash", (d, w) -> showNovaApiConfigDialog());
+                                } else {
+                                    errBuilder.setMessage(errText);
+                                    errBuilder.setNeutralButton("Proxy", (d, w) -> presentFragment(new ProxyListActivity()));
+                                }
+                                errBuilder.setPositiveButton(getString(R.string.OK), null);
+                                showDialog(errBuilder.create());
+                            }
                         }
+                    } else {
+                        needShowAlert(getString(R.string.AppName), "Connection error (" + error.code + ")");
                     }
                 }
                 if (!isRequestingFirebaseSms) {

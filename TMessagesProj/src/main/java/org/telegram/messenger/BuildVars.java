@@ -29,6 +29,34 @@ public class BuildVars {
     public static int APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : 4;
     public static String APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : "014b35b6184100b085b0d0572f9b5103";
 
+    public static void applySavedApiCredentials() {
+        try {
+            if (ApplicationLoader.applicationContext == null) return;
+            SharedPreferences prefs = ApplicationLoader.applicationContext.getSharedPreferences("novaconfig", Context.MODE_PRIVATE);
+            int savedId = prefs.getInt("custom_api_id", 0);
+            String savedHash = prefs.getString("custom_api_hash", "");
+            if (savedId > 0 && !android.text.TextUtils.isEmpty(savedHash)) {
+                APP_ID = savedId;
+                APP_HASH = savedHash.trim();
+            }
+        } catch (Throwable ignore) {
+        }
+    }
+
+    public static void saveCustomApiCredentials(int apiId, String apiHash) {
+        if (ApplicationLoader.applicationContext == null) return;
+        SharedPreferences prefs = ApplicationLoader.applicationContext.getSharedPreferences("novaconfig", Context.MODE_PRIVATE);
+        if (apiId > 0 && !android.text.TextUtils.isEmpty(apiHash)) {
+            APP_ID = apiId;
+            APP_HASH = apiHash.trim();
+            prefs.edit().putInt("custom_api_id", APP_ID).putString("custom_api_hash", APP_HASH).apply();
+        } else {
+            APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : 4;
+            APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : "014b35b6184100b085b0d0572f9b5103";
+            prefs.edit().remove("custom_api_id").remove("custom_api_hash").apply();
+        }
+    }
+
     // SafetyNet key for Google Identity SDK, set it to empty to disable
     public static String SAFETYNET_KEY = "AIzaSyDqt8P-7F7CPCseMkOiVRgb1LY8RN1bvH8";
     public static String PLAYSTORE_APP_URL = "https://github.com/h6rnyxxx/NovaGram/releases";
