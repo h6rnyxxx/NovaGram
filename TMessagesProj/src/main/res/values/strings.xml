@@ -11734,4 +11734,5 @@
     <string name="NovaUpdateSizeLine">APK Size: %1$s</string>
     <string name="NovaUpdateTitle">NovaGram Update Available</string>
     <string name="NovaUpdateDownload">Download &amp; Install</string>
+    <string name="NovaUpdateLater">Later</string>
 </resources>

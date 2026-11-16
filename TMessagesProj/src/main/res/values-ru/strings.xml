@@ -318,4 +318,5 @@
     <string name="NovaUpdateSizeLine">Размер APK: %1$s</string>
     <string name="NovaUpdateTitle">Доступно обновление NovaGram</string>
     <string name="NovaUpdateDownload">Скачать и установить</string>
+    <string name="NovaUpdateLater">Позже</string>
 </resources>

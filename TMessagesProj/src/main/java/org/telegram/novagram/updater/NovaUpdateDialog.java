@@ -58,7 +58,7 @@ public class NovaUpdateDialog {
                 }
             });
         }
-        builder.setNegativeButton(LocaleController.getString(R.string.Later), null);
+        builder.setNegativeButton(LocaleController.getString(R.string.NovaUpdateLater), null);
         builder.show();
     }
 }
