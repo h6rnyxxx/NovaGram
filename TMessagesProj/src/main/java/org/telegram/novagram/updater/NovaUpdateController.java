@@ -288,53 +288,15 @@ public class NovaUpdateController {
     }
 
     public synchronized void downloadUpdate() {
-        if (downloading) return;
-        File existing = getDownloadedFile();
-        if (existing != null) {
-            installDownloadedApk(LaunchActivity.instance, existing);
-            return;
-        }
-        if (TextUtils.isEmpty(apkUrl)) {
-            if (LaunchActivity.instance != null && !TextUtils.isEmpty(releaseUrl)) {
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl));
+        String targetUrl = !TextUtils.isEmpty(apkUrl) ? apkUrl : releaseUrl;
+        if (!TextUtils.isEmpty(targetUrl) && LaunchActivity.instance != null) {
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl));
                 LaunchActivity.instance.startActivity(browserIntent);
+            } catch (Throwable t) {
+                FileLog.e(t);
             }
-            return;
         }
-
-        File updatesDir = new File(ApplicationLoader.applicationContext.getFilesDir(), "novagram_updates");
-        if (!updatesDir.exists()) {
-            updatesDir.mkdirs();
-        }
-        File destFile = new File(updatesDir, "NovaGram-" + version + ".apk");
-
-        downloading = true;
-        downloadingProgress = 0.0f;
-        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateLoading);
-
-        downloadTask = new HttpGetFileTask(
-                downloadedFile -> AndroidUtilities.runOnUIThread(() -> {
-                    downloading = false;
-                    if (downloadedFile != null && downloadedFile.exists() && downloadedFile.length() > 0) {
-                        synchronized (NovaUpdateController.this) {
-                            downloadedPath = downloadedFile.getAbsolutePath();
-                            saveLocked();
-                        }
-                        downloadingProgress = 1.0f;
-                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
-                        if (LaunchActivity.instance != null) {
-                            installDownloadedApk(LaunchActivity.instance, downloadedFile);
-                        }
-                    } else {
-                        NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
-                    }
-                }),
-                progress -> {
-                    downloadingProgress = progress;
-                    NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateLoading);
-                }
-        ).setDestFile(destFile).setOverrideExtension("apk");
-        downloadTask.execute(apkUrl);
     }
 
     public void cancelDownloading() {

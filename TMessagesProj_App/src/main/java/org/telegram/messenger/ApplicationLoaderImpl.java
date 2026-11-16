@@ -22,10 +22,6 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
 
     @Override
     public boolean checkApkInstallPermissions(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ApplicationLoader.applicationContext.getPackageManager().canRequestPackageInstalls()) {
-            AlertsCreator.createApkRestrictedDialog(context, null).show();
-            return false;
-        }
         return true;
     }
 
