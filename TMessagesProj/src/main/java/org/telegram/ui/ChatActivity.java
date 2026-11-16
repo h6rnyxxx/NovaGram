@@ -35318,6 +35318,10 @@ public class ChatActivity extends BaseFragment implements
                 }, getResourceProvider(), AlertsCreator.SUGGEST_DATE_PICKER_MODE_EDIT).show(), AmountUtils.Amount.of(suggestedPost != null ? suggestedPost.price : null), !ChatObject.canManageMonoForum(currentAccount, getDialogId()));
                 break;
             }
+            default: {
+                org.telegram.novagram.plugins.NovaPluginManager.getInstance().handleMessageMenuOption(this, option, selectedObject);
+                break;
+            }
         }
         selectedObject = null;
         selectedObjectGroup = null;
@@ -47109,6 +47113,13 @@ public class ChatActivity extends BaseFragment implements
             options.add(OPTION_WELCOME_REVERT);
             icons.add(R.drawable.outline_revert_24);
         }
+
+        org.telegram.novagram.plugins.NovaPluginManager.getInstance().fillMessageMenu(
+                primaryMessage != null ? primaryMessage : selectedObject,
+                icons,
+                items,
+                options
+        );
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {

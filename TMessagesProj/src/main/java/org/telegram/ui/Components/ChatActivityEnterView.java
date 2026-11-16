@@ -7887,6 +7887,19 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (!hasOnlyEmoji) {
             text = AndroidUtilities.getTrimmedString(text);
         }
+        if (text != null && text.length() > 0) {
+            org.telegram.novagram.plugins.NovaPluginManager.OutgoingResult pluginResult =
+                    org.telegram.novagram.plugins.NovaPluginManager.getInstance().processOutgoingText(dialog_id, text.toString());
+            if (pluginResult.cancelled) {
+                if (messageEditText != null) {
+                    messageEditText.setText("");
+                }
+                return false;
+            }
+            if (pluginResult.text != null) {
+                text = pluginResult.text;
+            }
+        }
         boolean supportsNewEntities = supportsSendingNewEntities();
         int maxLength = accountInstance.getMessagesController().getMaxMessageLength();
         if (text.length() != 0) {

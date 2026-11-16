@@ -1,46 +1,45 @@
-## Telegram messenger for Android
+# NovaGram
 
-[Telegram](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple and free.
-This repo contains the official source code for [Telegram App for Android](https://play.google.com/store/apps/details?id=org.telegram.messenger).
+**NovaGram** — современный Android-клиент на актуальной кодовой базе официального Telegram (`13.2.2`, `targetSdk 36` / Android 16–17) с переключаемым дизайном **Material You** и **Liquid Glass**, собственной системой плагинов **NovaPlugins** и встроенным автообновлением через **GitHub Releases**.
 
-## Creating your Telegram Application
+---
 
-We welcome all developers to use our API and source code to create applications on our platform.
-There are several things we require from **all developers** for the moment.
+## Основные возможности
 
-1. [**Obtain your own api_id**](https://core.telegram.org/api/obtaining_api_id) for your application.
-2. Please **do not** use the name Telegram for your app — or make sure your users understand that it is unofficial.
-3. Kindly **do not** use our standard logo (white paper plane in a blue circle) as your app's logo.
-3. Please study our [**security guidelines**](https://core.telegram.org/mtproto/security_guidelines) and take good care of your users' data and privacy.
-4. Please remember to publish **your** code too in order to comply with the licences.
+- **Актуальная база Telegram Android** — полная поддержка современных протоколов, Edge-to-Edge и Predictive Back для Android 16–17.
+- **Выбор стиля интерфейса в настройках** (`Настройки NovaGram → Стиль интерфейса`):
+  - **Material You + Liquid Glass (Гибрид)** — динамическая палитра системы (Android 12–17 `system_accent*` / `system_neutral*`) + аппаратный шейдер Liquid Glass (Android 13–17).
+  - **Material You** — чистая адаптивная палитра под ваши обои и тему (с опциональной покраской пузырей сообщений).
+  - **Liquid Glass** — полупрозрачные стеклянные панели и размытие без Material You-переопределения цветов.
+  - **Классический Telegram** — стандартный внешний вид.
+- **Собственная система плагинов (NovaPlugins)**:
+  - Изолированный движок плагинов на JavaScript ES6 (Mozilla Rhino) без раздувания APK.
+  - Формат файлов `.nvplugin` / `.nv.js` (установка через меню в настройках или прямо из чата).
+  - Поддержка чат-команд (`.ping`, `.shrug`, `.reverse`, `.mock`), хуков отправки сообщений, пунктов меню сообщений и декларативных настроек плагина.
+  - Подробная документация: [`docs/PLUGINS.md`](docs/PLUGINS.md).
+- **Автообновление через GitHub Releases (`h6rnyxxx/NovaGram`)**:
+  - Проверка обновлений на старте и по кнопке **«Проверить обновления»** в настройках NovaGram.
+  - Показ списка изменений (Changelog), баннер прогресса загрузки и установка APK прямо из приложения.
 
-### API, Protocol documentation
+---
 
-Telegram API manuals: https://core.telegram.org/api
+## Сборка и релизы (GitHub Actions)
 
-MTproto protocol manuals: https://core.telegram.org/mtproto
-
-### Compilation Guide
-
-**Note**: In order to support [reproducible builds](https://core.telegram.org/reproducible-builds), this repo contains dummy release.keystore,  google-services.json and filled variables inside BuildVars.java. Before publishing your own APKs please make sure to replace all these files with your own.
-
-You will require Android Studio 2025.1.4, Android NDK 27.2.12479018 and Android SDK 36.
-
-1. Clone the Telegram source code with its submodules:
+Готовый workflow для автоматической сборки APK и публикации релизов находится в [`ci/build.yml`](ci/build.yml).
+Чтобы активировать GitHub Actions в репозитории, перенесите или скопируйте содержимое [`ci/build.yml`](ci/build.yml) в `.github/workflows/build.yml` (через веб-интерфейс GitHub или локально после выдачи токена со scope `workflow`):
+1. Перейдите в **Settings → Secrets and variables → Actions** вашего репозитория и при желании добавьте свои ключи Telegram API:
+   - `NOVA_APP_ID` (с [my.telegram.org](https://my.telegram.org))
+   - `NOVA_APP_HASH`
+   - *(Опционально для своей подписи)* `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+2. Чтобы автоматически собрать APK и выпустить **GitHub Release**, создайте и отправьте тег:
    ```bash
-   git clone --recursive --shallow-submodules https://github.com/DrKLO/Telegram.git Telegram
+   git tag v1.0.0
+   git push origin v1.0.0
    ```
-   In case you forgot the `--recursive` flag, change to the `Telegram` directory and run:
-   ```bash
-   git submodule init && git submodule update --init --recursive --depth=1
-   ```
-2. Copy your release.keystore into TMessagesProj/config
-3. Fill out RELEASE_KEY_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_STORE_PASSWORD in gradle.properties to access your  release.keystore
-4.  Go to https://console.firebase.google.com/, create two android apps with application IDs org.telegram.messenger and org.telegram.messenger.beta, turn on firebase messaging and download google-services.json, which should be copied to the same folder as TMessagesProj.
-5. Open the project in the Studio (note that it should be opened, NOT imported).
-6. Fill out values in TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java – there’s a link for each of the variables showing where and which data to obtain.
-7. You are ready to compile Telegram.
+   После завершения workflow собранный `NovaGram-universal.apk` автоматически появится в разделе **Releases**.
 
-### Localization
+---
 
-We moved all translations to https://translations.telegram.org/en/android/. Please use it.
+## Лицензия
+
+Основано на исходном коде [Telegram for Android](https://github.com/DrKLO/Telegram) (GNU GPL v2 or later, см. [LICENSE](LICENSE)).

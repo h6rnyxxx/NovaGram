@@ -6177,6 +6177,7 @@ public class Theme {
         }
         applyCalculatedTableColors(currentColorsNoAccent, colors, currentTheme.isDark());
         applyCalculatedArticleCodeColors(currentColorsNoAccent, colors, currentTheme.isDark());
+        org.telegram.novagram.design.NovaMonetTheme.applyToColorTable(colors, currentTheme.isDark());
         shouldDrawGradientIcons = gradientIcons;
         currentColors = colors;
         if (!messages) {
@@ -9148,7 +9149,7 @@ public class Theme {
                 || key_chat_stickerReplyLine == key || key_chat_stickerReplyNameText == key || key_chat_stickerReplyMessageText == key)) {
             return 0xffffffff;
         }
-        if (currentTheme == defaultTheme) {
+        if (currentTheme == defaultTheme && !org.telegram.novagram.NovaConfig.isMaterialYouActive()) {
             boolean useDefault;
             if (isMyMessagesBubbles(key)) {
                 useDefault = currentTheme.isDefaultMyMessagesBubbles();

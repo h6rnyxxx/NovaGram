@@ -82,6 +82,13 @@
 -keep class ru.noties.jlatexmath.** { *; }
 -dontwarn org.scilab.forge.jlatexmath.**
 
+# NovaGram NovaPlugins (Rhino JS engine & reflection bridge)
+-keep class org.mozilla.javascript.** { *; }
+-dontwarn org.mozilla.javascript.**
+-dontwarn org.mozilla.classfile.**
+-keep class org.telegram.novagram.plugins.NovaPluginApi { *; }
+-keep class org.telegram.novagram.plugins.NovaPluginApi$* { *; }
+
 # Use -keep to explicitly keep any other classes shrinking would remove
 #-dontoptimize
 #-dontobfuscate
