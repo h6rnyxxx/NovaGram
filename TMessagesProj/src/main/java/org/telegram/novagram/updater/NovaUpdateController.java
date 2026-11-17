@@ -587,6 +587,12 @@ public class NovaUpdateController {
         return f;
     }
 
+    public void resumePendingInstall() {
+        if (LaunchActivity.instance != null) {
+            resumePendingInstallIfReady(LaunchActivity.instance);
+        }
+    }
+
     public void resumePendingInstallIfReady(Activity activity) {
         if (activity == null || pendingInstallAfterPermission == null) {
             return;

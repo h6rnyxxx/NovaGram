@@ -213,14 +213,23 @@ public class ConnectionsManager extends BaseController {
     public ConnectionsManager(int instance) {
         super(instance);
         connectionState = native_getConnectionState(currentAccount);
+        initWithCurrentConfig();
+    }
+
+    public void reinitForNewApiCredentials() {
+        cleanup(true);
+        initWithCurrentConfig();
+    }
+
+    private void initWithCurrentConfig() {
         String deviceModel;
         String systemLangCode;
         String langCode;
         String appVersion;
         String systemVersion;
         File config = ApplicationLoader.getFilesDirFixed();
-        if (instance != 0) {
-            config = new File(config, "account" + instance);
+        if (currentAccount != 0) {
+            config = new File(config, "account" + currentAccount);
             config.mkdirs();
         }
         String configPath = config.toString();

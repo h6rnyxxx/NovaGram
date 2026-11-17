@@ -1071,14 +1071,14 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         EditText idInput = new EditText(getParentActivity());
         idInput.setHint("API ID (e.g. 12345678)");
         idInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        idInput.setText(BuildVars.APP_ID != 4 ? String.valueOf(BuildVars.APP_ID) : "");
+        idInput.setText(BuildVars.hasCustomApiCredentials() ? String.valueOf(BuildVars.APP_ID) : "");
         idInput.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
         idInput.setHintTextColor(Theme.getColor(Theme.key_dialogTextGray3));
         layout.addView(idInput, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         EditText hashInput = new EditText(getParentActivity());
         hashInput.setHint("API Hash (32 hex chars)");
-        hashInput.setText(BuildVars.APP_ID != 4 ? BuildVars.APP_HASH : "");
+        hashInput.setText(BuildVars.hasCustomApiCredentials() ? BuildVars.APP_HASH : "");
         hashInput.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
         hashInput.setHintTextColor(Theme.getColor(Theme.key_dialogTextGray3));
         layout.addView(hashInput, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
@@ -1090,7 +1090,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     int id = Utilities.parseInt(idInput.getText().toString().trim());
                     String hash = hashInput.getText().toString().trim();
                     BuildVars.saveCustomApiCredentials(id, hash);
-                    ConnectionsManager.getInstance(currentAccount).cleanup(false);
+                    ConnectionsManager.getInstance(currentAccount).reinitForNewApiCredentials();
                 })
                 .setNegativeButton(getString(R.string.Cancel), null)
                 .show();
@@ -3309,7 +3309,16 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                             needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("CodeExpired", R.string.CodeExpired));
                         } else if (error.text.startsWith("FLOOD_WAIT")) {
                             needShowAlert(getString(R.string.RestorePasswordNoEmailTitle), getString("FloodWait", R.string.FloodWait));
+                        } else if ((error.code == 406 || error.text.contains("API_ID") || error.text.contains("UPDATE_APP") || error.text.contains("SEND_CODE_UNAVAILABLE"))
+                                && BuildVars.advanceFallbackApiCredentials()) {
+                            ConnectionsManager.getInstance(currentAccount).reinitForNewApiCredentials();
+                            confirmedNumber = true;
+                            onNextPressed(null);
+                            return;
                         } else {
+                            if (!BuildVars.hasCustomApiCredentials() && (error.code == 406 || error.text.contains("API_ID") || error.text.contains("UPDATE_APP"))) {
+                                BuildVars.resetFallbackApiCredentials();
+                            }
                             Dialog shown = error.code != 406 && error.code != -1000
                                     ? AlertsCreator.processError(currentAccount, error, LoginActivity.this, req, phoneInputData.phoneNumber)
                                     : null;

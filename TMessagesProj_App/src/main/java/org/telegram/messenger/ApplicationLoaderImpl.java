@@ -38,10 +38,7 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
 
     @Override
     public void onResume() {
-        Activity activity = org.telegram.ui.LaunchActivity.instance;
-        if (activity != null) {
-            NovaUpdateController.getInstance().resumePendingInstallIfReady(activity);
-        }
+        NovaUpdateController.getInstance().resumePendingInstall();
     }
 
     @Override
