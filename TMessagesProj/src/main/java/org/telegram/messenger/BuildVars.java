@@ -26,22 +26,11 @@ public class BuildVars {
     public static boolean NO_SCOPED_STORAGE = Build.VERSION.SDK_INT <= 29;
     public static String BUILD_VERSION_STRING = BuildConfig.BUILD_VERSION_STRING;
 
-    private static final int[] FALLBACK_APP_IDS = new int[]{
-            21724,
-            2040,
-            2834,
-            6
-    };
-    private static final String[] FALLBACK_APP_HASHES = new String[]{
-            "3e0cb5efcd52300aec5994fdfc5bdc16",
-            "b18441a1ff607e10a989891a5462e627",
-            "68875f756c9b437a8b916ca3de215815",
-            "eb06d4abfb49dc3eeb1aeb98ae0f581e"
-    };
-    private static int fallbackAttemptIndex = 0;
+    public static final int DEFAULT_APP_ID = 4;
+    public static final String DEFAULT_APP_HASH = "014b35b6184100b085b0d0572f9b5103";
 
-    public static int APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : FALLBACK_APP_IDS[0];
-    public static String APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : FALLBACK_APP_HASHES[0];
+    public static int APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : DEFAULT_APP_ID;
+    public static String APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : DEFAULT_APP_HASH;
 
     public static boolean hasCustomApiCredentials() {
         try {
@@ -53,37 +42,8 @@ public class BuildVars {
         }
     }
 
-    public static boolean advanceFallbackApiCredentials() {
-        if (hasCustomApiCredentials() || BuildConfig.NOVA_APP_ID != 0) {
-            return false;
-        }
-        if (fallbackAttemptIndex + 1 >= FALLBACK_APP_IDS.length) {
-            return false;
-        }
-        fallbackAttemptIndex++;
-        APP_ID = FALLBACK_APP_IDS[fallbackAttemptIndex];
-        APP_HASH = FALLBACK_APP_HASHES[fallbackAttemptIndex];
-        try {
-            if (ApplicationLoader.applicationContext != null) {
-                ApplicationLoader.applicationContext.getSharedPreferences("novaconfig", Context.MODE_PRIVATE)
-                        .edit().putInt("active_fallback_idx", fallbackAttemptIndex).apply();
-            }
-        } catch (Throwable ignore) {
-        }
-        return true;
-    }
-
-    public static void resetFallbackApiCredentials() {
-        fallbackAttemptIndex = 0;
-        APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : FALLBACK_APP_IDS[0];
-        APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : FALLBACK_APP_HASHES[0];
-        try {
-            if (ApplicationLoader.applicationContext != null) {
-                ApplicationLoader.applicationContext.getSharedPreferences("novaconfig", Context.MODE_PRIVATE)
-                        .edit().remove("active_fallback_idx").apply();
-            }
-        } catch (Throwable ignore) {
-        }
+    public static boolean hasConfiguredApiCredentials() {
+        return BuildConfig.NOVA_APP_ID != 0 || hasCustomApiCredentials();
     }
 
     public static void applySavedApiCredentials() {
@@ -95,13 +55,9 @@ public class BuildVars {
             if (savedId > 0 && !android.text.TextUtils.isEmpty(savedHash)) {
                 APP_ID = savedId;
                 APP_HASH = savedHash.trim();
-            } else if (BuildConfig.NOVA_APP_ID == 0) {
-                int idx = prefs.getInt("active_fallback_idx", 0);
-                if (idx >= 0 && idx < FALLBACK_APP_IDS.length) {
-                    fallbackAttemptIndex = idx;
-                    APP_ID = FALLBACK_APP_IDS[idx];
-                    APP_HASH = FALLBACK_APP_HASHES[idx];
-                }
+            } else {
+                APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : DEFAULT_APP_ID;
+                APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : DEFAULT_APP_HASH;
             }
         } catch (Throwable ignore) {
         }
@@ -115,10 +71,9 @@ public class BuildVars {
             APP_HASH = apiHash.trim();
             prefs.edit().putInt("custom_api_id", APP_ID).putString("custom_api_hash", APP_HASH).apply();
         } else {
-            fallbackAttemptIndex = 0;
-            APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : FALLBACK_APP_IDS[0];
-            APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : FALLBACK_APP_HASHES[0];
-            prefs.edit().remove("custom_api_id").remove("custom_api_hash").remove("active_fallback_idx").apply();
+            APP_ID = BuildConfig.NOVA_APP_ID != 0 ? BuildConfig.NOVA_APP_ID : DEFAULT_APP_ID;
+            APP_HASH = !android.text.TextUtils.isEmpty(BuildConfig.NOVA_APP_HASH) ? BuildConfig.NOVA_APP_HASH : DEFAULT_APP_HASH;
+            prefs.edit().remove("custom_api_id").remove("custom_api_hash").apply();
         }
     }
 
